@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>合约保证金查看器</title>
+    <!-- 引入 Tailwind CSS 以便快速构建美观的界面 -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- 引入 Inter 字体 -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* --- 基础和布局样式 --- */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #ffffff; /* 修改: 将背景色改为白色 */
+        }
+        .container {
+            max-width: 800px; /* 恢复为适合桌面的宽度 */
+            margin: 2rem auto;
+            padding: 2rem;
+            background-color: #ffffff;
+            border-radius: 12px;
+            /* 在白色背景下，可以稍微加深阴影以突出卡片 */
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); 
+        }
+        @media (max-width: 640px) {
+            .container {
+                max-width: 100%;
+                margin: 0;
+                padding: 1rem;
+                box-shadow: none;
+                border-radius: 0;
+            }
+        }
+
+        /* --- 自定义下拉菜单样式 --- */
+        .custom-select-wrapper {
+            position: relative;
+            width: 100%;
+        }
+        .custom-select-trigger {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 10px 15px;
+            font-size: 0.9rem;
+            background-color: #fff;
+            cursor: pointer;
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .custom-select-trigger:focus, .custom-select-wrapper.open .custom-select-trigger {
+            border-color: #00C49A;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(0, 196, 154, 0.2);
+        }
+        .custom-select-options {
+            position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+            background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); z-index: 10;
+            opacity: 0; visibility: hidden;
+            transform: scale(0.98); transform-origin: top;
+            transition: all 0.2s ease-in-out;
+        }
+        .custom-select-wrapper.open .custom-select-options {
+            opacity: 1; visibility: visible; transform: scale(1);
+        }
+        .custom-select-option { padding: 10px 15px; cursor: pointer; font-size: 0.9rem; }
+        .custom-select-option:hover { background-color: #f3f4f6; }
+        .custom-select-option.selected { font-weight: 600; }
+
+        /* --- 搜索框样式 --- */
+        .search-input {
+            border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 15px 10px 35px;
+            font-size: 0.9rem; width: 100%;
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .search-input:focus {
+            border-color: #00C49A; outline: none; box-shadow: 0 0 0 3px rgba(0, 196, 154, 0.2);
+        }
+        .search-icon {
+            position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+            color: #9ca3af; pointer-events: none;
+        }
+
+        /* --- 数据展示卡片样式 --- */
+        .tier-card {
+            border: 1px solid #f3f4f6; background-color: #ffffff;
+            border-radius: 12px; padding: 1rem; margin-bottom: 1rem;
+            transition: all 0.2s ease-in-out;
+        }
+        .tier-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            border-color: #e5e7eb;
+        }
+        .tier-card h3 {
+            font-size: 1.1rem; font-weight: 600; color: #1a1a1a;
+            margin-bottom: 0.75rem;
+        }
+        .info-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 6px 0; font-size: 0.875rem;
+        }
+        .info-item span:first-child { color: #6b7280; }
+        .info-item span:last-child { color: #374151; font-weight: 500; }
+        
+        /* --- 分页样式 --- */
+        .pagination-button {
+            display: flex; align-items: center; justify-content: center;
+            width: 36px; height: 36px; border-radius: 50%;
+            border: 1px solid #e5e7eb; background-color: #ffffff;
+            cursor: pointer; color: #6b7280; transition: all 0.2s ease-in-out;
+        }
+        .pagination-button:hover:not(:disabled) { background-color: #f3f4f6; }
+        .pagination-button.active {
+            background-color: #1a1a1a; color: #ffffff; border-color: #1a1a1a;
+        }
+        .pagination-button:disabled { cursor: not-allowed; opacity: 0.5; }
+
+        /* --- 其他 --- */
+        .loading-spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1); border-left-color: #1a1a1a;
+            border-radius: 50%; width: 24px; height: 24px;
+            animation: spin 1s linear infinite; margin: 40px auto;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="container">
+        <p class="text-sm text-gray-500 mb-4" id="update-time">更新时间：加载中...</p>
+        
+        <div class="flex items-center space-x-4 mb-4">
+            <div class="bg-gray-100 text-gray-800 py-2 px-4 rounded-lg text-sm font-medium flex items-center justify-center whitespace-nowrap">USDT 本位</div>
+            <div class="w-full custom-select-wrapper" id="custom-select-wrapper">
+                <button id="custom-select-trigger" class="custom-select-trigger">
+                    <span id="selected-option-text"></span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+                <div id="custom-select-options" class="custom-select-options"></div>
+            </div>
+        </div>
+
+        <div class="mb-6 relative" id="search-wrapper">
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" id="contract-search-input" placeholder="搜寻币对" class="search-input">
+            <div id="search-suggestions" class="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg mt-1 shadow-lg z-10 hidden"></div>
+        </div>
+        
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">全仓 & 逐仓</h2>
+
+        <div id="data-display" class="min-h-[200px]">
+            <div id="loader-container" class="hidden"><div class="loading-spinner"></div></div>
+            <div id="error-container" class="hidden p-4 bg-red-50 text-red-700 rounded-lg"><p id="error-message"></p></div>
+            <div id="no-data-container" class="hidden text-center py-20 text-gray-500"><p>暂无数据</p></div>
+            <div id="results-container"></div>
+        </div>
+
+        <div id="pagination-controls" class="flex justify-center items-center mt-6 gap-2 hidden"></div>
+    </div>
+
+    <script>
+        // --- 配置 ---
+        const API_ENDPOINT = 'https://futuresopenapi.100ex.com/fapi/v1/get_ladder_info';
+        const PREDEFINED_CONTRACTS = [
+            { name: 'BTC-USDT-永续合约', id: 1 },
+            { name: 'ETH-USDT-永续合约', id: 2 },
+        ];
+        
+        // --- 状态管理 ---
+        let currentContractData = null;
+        let currentPage = 1;
+        const pageSize = 20;
+
+        // --- DOM 元素引用 ---
+        const selectWrapper = document.getElementById('custom-select-wrapper');
+        const selectTrigger = document.getElementById('custom-select-trigger');
+        const selectedOptionText = document.getElementById('selected-option-text');
+        const optionsContainer = document.getElementById('custom-select-options');
+        const searchInput = document.getElementById('contract-search-input');
+        const searchSuggestions = document.getElementById('search-suggestions');
+        const loader = document.getElementById('loader-container');
+        const errorContainer = document.getElementById('error-container');
+        const errorMessage = document.getElementById('error-message');
+        const noDataContainer = document.getElementById('no-data-container');
+        const resultsContainer = document.getElementById('results-container');
+        const paginationControls = document.getElementById('pagination-controls');
+        const updateTimeElement = document.getElementById('update-time'); 
+
+        // --- 函数 ---
+        function updateTimestamp() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            updateTimeElement.textContent = `更新时间: ${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+        }
+
+        function populateCustomDropdown() {
+            optionsContainer.innerHTML = '';
+            PREDEFINED_CONTRACTS.forEach(contract => {
+                const optionElement = document.createElement('div');
+                optionElement.className = 'custom-select-option';
+                optionElement.textContent = contract.name;
+                optionElement.dataset.value = contract.id;
+                optionElement.addEventListener('click', () => {
+                    handleOptionSelect(contract);
+                });
+                optionsContainer.appendChild(optionElement);
+            });
+        }
+        
+        function handleOptionSelect(contract) {
+            selectedOptionText.textContent = contract.name;
+            document.querySelectorAll('.custom-select-option').forEach(opt => {
+                opt.classList.toggle('selected', opt.dataset.value == contract.id);
+            });
+            selectWrapper.classList.remove('open');
+            searchInput.value = '';
+            searchSuggestions.classList.add('hidden');
+            fetchData(contract.id);
+        }
+
+        async function fetchData(contractId) {
+            updateTimestamp(); 
+            resultsContainer.innerHTML = ''; 
+            paginationControls.classList.add('hidden'); 
+            loader.classList.remove('hidden');
+            errorContainer.classList.add('hidden');
+            noDataContainer.classList.add('hidden');
+            try {
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contractId: parseInt(contractId) })
+                });
+                if (!response.ok) throw new Error(`网络错误: ${response.status}`);
+                const responseData = await response.json();
+                if (responseData.code !== '0') throw new Error(`API 错误: ${responseData.msg}`);
+                currentContractData = responseData.data;
+                goToPage(1);
+            } catch (error) {
+                console.error('Fetch error:', error);
+                showError(error.message);
+            } finally {
+                loader.classList.add('hidden');
+            }
+        }
+        
+        function handleSearch() {
+            const searchTerm = searchInput.value.trim().toUpperCase();
+            searchSuggestions.innerHTML = '';
+            searchSuggestions.classList.add('hidden');
+
+            if (!searchTerm) {
+                if (currentContractData) {
+                    updateUI();
+                }
+                return;
+            }
+
+            const foundContracts = PREDEFINED_CONTRACTS.filter(contract =>
+                contract.name.toUpperCase().includes(searchTerm)
+            );
+
+            if (foundContracts.length > 0) {
+                if (!noDataContainer.classList.contains('hidden')) {
+                    updateUI();
+                }
+                foundContracts.forEach(contract => {
+                    const item = document.createElement('div');
+                    item.className = 'p-2 hover:bg-gray-100 cursor-pointer text-sm';
+                    item.textContent = contract.name;
+                    item.onclick = () => {
+                        handleOptionSelect(contract);
+                    };
+                    searchSuggestions.appendChild(item);
+                });
+                searchSuggestions.classList.remove('hidden');
+            } else {
+                showNoData();
+            }
+        }
+
+        function goToPage(page) {
+            currentPage = page;
+            updateUI();
+        }
+
+        function updateUI() {
+            resultsContainer.innerHTML = '';
+            errorContainer.classList.add('hidden');
+            noDataContainer.classList.add('hidden'); 
+
+            if (!currentContractData?.ladderList?.ladderList || !currentContractData?.leverList?.leverList) {
+                showError('返回的数据格式不完整。');
+                return;
+            }
+            
+            const numberFormatter = new Intl.NumberFormat('en-US');
+            const ladderTiers = currentContractData.ladderList.ladderList;
+            const leverTiers = currentContractData.leverList.leverList;
+            const reversedLeverTiers = [...leverTiers].reverse();
+
+            const startIndex = (currentPage - 1) * pageSize;
+            const endIndex = startIndex + pageSize;
+            const paginatedTiers = ladderTiers.slice(startIndex, endIndex);
+
+            if (paginatedTiers.length > 0) {
+                resultsContainer.classList.remove('hidden');
+                paginatedTiers.forEach(tier => {
+                    const leverageIndex = tier.level - 1;
+                    const correspondingLeverTier = reversedLeverTiers[leverageIndex];
+                    const maxLeverageForTier = correspondingLeverTier ? correspondingLeverTier.maxLever : 'N/A';
+
+                    const cardHtml = `
+                        <div class="tier-card">
+                            <h3>档位 ${tier.level}</h3>
+                            <div class="space-y-1">
+                                <div class="info-item"><span>风险限额</span><span>${numberFormatter.format(tier.maxPositionValue)}</span></div>
+                                <div class="info-item"><span>最大杠杆</span><span>${maxLeverageForTier}x</span></div>
+                                <div class="info-item"><span>维持保证金率</span><span>${(tier.minMarginRate * 100).toFixed(2)}%</span></div>
+                                <div class="info-item"><span>维持保证金扣减额</span><span>${numberFormatter.format(tier.deduction)}</span></div>
+                            </div>
+                        </div>`;
+                    resultsContainer.innerHTML += cardHtml;
+                });
+            } else {
+                 showNoData();
+            }
+            renderPaginationControls(ladderTiers.length);
+        }
+
+        function renderPaginationControls(totalItems) {
+            paginationControls.innerHTML = '';
+            const totalPages = Math.ceil(totalItems / pageSize);
+
+            if (totalPages <= 1) {
+                paginationControls.classList.add('hidden');
+                return;
+            }
+            paginationControls.classList.remove('hidden');
+
+            const prevButton = document.createElement('button');
+            prevButton.className = 'pagination-button';
+            prevButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>`;
+            prevButton.disabled = currentPage === 1;
+            prevButton.addEventListener('click', () => goToPage(currentPage - 1));
+            paginationControls.appendChild(prevButton);
+
+            for (let i = 1; i <= totalPages; i++) {
+                const pageButton = document.createElement('button');
+                pageButton.textContent = i;
+                pageButton.className = 'pagination-button';
+                if (i === currentPage) pageButton.classList.add('active');
+                pageButton.addEventListener('click', () => goToPage(i));
+                paginationControls.appendChild(pageButton);
+            }
+
+            const nextButton = document.createElement('button');
+            nextButton.className = 'pagination-button';
+            nextButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>`;
+            nextButton.disabled = currentPage === totalPages;
+            nextButton.addEventListener('click', () => goToPage(currentPage + 1));
+            paginationControls.appendChild(nextButton);
+        }
+
+        function showError(message) {
+            errorMessage.textContent = `加载失败: ${message}.`;
+            errorContainer.classList.remove('hidden');
+            resultsContainer.classList.add('hidden');
+            paginationControls.classList.add('hidden');
+            noDataContainer.classList.add('hidden');
+        }
+        
+        function showNoData() {
+            resultsContainer.classList.add('hidden');
+            paginationControls.classList.add('hidden');
+            errorContainer.classList.add('hidden');
+            noDataContainer.classList.remove('hidden');
+        }
+
+        // --- 事件监听 ---
+        selectTrigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectWrapper.classList.toggle('open');
+        });
+        
+        document.addEventListener('click', (event) => {
+            if (!selectWrapper.contains(event.target)) {
+                selectWrapper.classList.remove('open');
+            }
+            if (!document.getElementById('search-wrapper').contains(event.target)) {
+                searchSuggestions.classList.add('hidden');
+            }
+        });
+
+        searchInput.addEventListener('input', handleSearch);
+        searchInput.addEventListener('focus', handleSearch);
+
+        // --- 初始化 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            updateTimestamp();
+            populateCustomDropdown();
+            if (PREDEFINED_CONTRACTS.length > 0) {
+                handleOptionSelect(PREDEFINED_CONTRACTS[0]);
+            }
+        });
+    </script>
+</body>
+</html>
