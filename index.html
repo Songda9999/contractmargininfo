@@ -12,16 +12,15 @@
         /* --- 基础和布局样式 --- */
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #ffffff; /* 修改: 将背景色改为白色 */
+            background-color: #ffffff; 
         }
         .container {
-            max-width: 800px; /* 恢复为适合桌面的宽度 */
+            max-width: 800px; 
             margin: 2rem auto;
             padding: 2rem;
             background-color: #ffffff;
             border-radius: 12px;
-            /* 在白色背景下，可以稍微加深阴影以突出卡片 */
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); 
+            border: 1px solid #e5e7eb; 
         }
         @media (max-width: 640px) {
             .container {
@@ -30,6 +29,7 @@
                 padding: 1rem;
                 box-shadow: none;
                 border-radius: 0;
+                border: none;
             }
         }
 
@@ -114,7 +114,8 @@
             border: 1px solid #e5e7eb; background-color: #ffffff;
             cursor: pointer; color: #6b7280; transition: all 0.2s ease-in-out;
         }
-        .pagination-button:hover:not(:disabled) { background-color: #f3f4f6; }
+        /* 修改: 移除分页按钮的悬停背景色 */
+        .pagination-button:hover:not(:disabled) { /* background-color: #f3f4f6; */ }
         .pagination-button.active {
             background-color: #1a1a1a; color: #ffffff; border-color: #1a1a1a;
         }
@@ -325,7 +326,7 @@
                             <h3>档位 ${tier.level}</h3>
                             <div class="space-y-1">
                                 <div class="info-item"><span>风险限额</span><span>${numberFormatter.format(tier.maxPositionValue)}</span></div>
-                                <div class="info-item"><span>最大杠杆</span><span>${maxLeverageForTier}x</span></div>
+                                <div class="info-item"><span>最大杠杆</span><span>${maxLeverageForTier}</span></div>
                                 <div class="info-item"><span>维持保证金率</span><span>${(tier.minMarginRate * 100).toFixed(2)}%</span></div>
                                 <div class="info-item"><span>维持保证金扣减额</span><span>${numberFormatter.format(tier.deduction)}</span></div>
                             </div>
