@@ -19,7 +19,6 @@
             margin: 2rem auto;
             padding: 2rem;
             background-color: #ffffff;
-            /* 修改: 移除了边框和圆角 */
             border-radius: 0;
             border: none; 
         }
@@ -74,8 +73,12 @@
 
         /* --- 搜索框样式 --- */
         .search-input {
-            border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 15px 10px 35px;
-            font-size: 0.9rem; width: 100%;
+            border: 1px solid #e5e7eb; 
+            border-radius: 8px; 
+            /* 修改: 减小垂直内边距和字体大小 */
+            padding: 8px 15px 8px 35px;
+            font-size: 0.875rem; 
+            width: 100%;
             transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
         }
         .search-input:focus {
@@ -92,7 +95,6 @@
             border-radius: 12px; 
             padding: 1rem; 
             margin-bottom: 1rem;
-            /* 修改: 为每个卡片添加细微边框 */
             border: 1px solid #f3f4f6;
             transition: all 0.2s ease-in-out;
         }
